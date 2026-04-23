@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN country_name TEXT NOT NULL DEFAULT '';
