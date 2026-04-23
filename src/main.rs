@@ -728,15 +728,20 @@ fn parse_natural_language_query(
     }
 
     // Country matching: check country_name and demonym from the live mapping
+    // Use word boundaries to avoid partial matches (e.g., "in" from "invalidquery")
     'outer: for (country_id, entry) in mapping.iter() {
         let name_lower = entry.country_name.to_lowercase();
         let demonym_lower = entry.demonym.to_lowercase();
         let id_lower = country_id.to_lowercase();
 
+        // Check for exact word matches using word boundaries
         for token in [&name_lower, &demonym_lower, &id_lower] {
-            if q.contains(token.as_str()) {
-                filters.country_id = Some(country_id.clone());
-                break 'outer;
+            // Create regex with word boundaries for exact matching
+            if let Ok(regex) = regex::Regex::new(&format!(r"\b{}\b", regex::escape(token))) {
+                if regex.is_match(&q) {
+                    filters.country_id = Some(country_id.clone());
+                    break 'outer;
+                }
             }
         }
     }
@@ -902,6 +907,8 @@ struct SimplifiedProfile {
     age_group: String,
     country_id: String,
     country_name: String,
+    gender_probability: f64,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]
