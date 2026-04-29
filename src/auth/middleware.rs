@@ -16,14 +16,12 @@ use crate::{
 
 #[derive(Clone, Debug, Serialize)]
 pub struct AuthenticatedUser {
-    pub id: String,
-    pub username: String,
-    pub role: String,
+    pub user: crate::users::model::User,
 }
 
 impl AuthenticatedUser {
     pub fn role(&self) -> Role {
-        Role::from_str(&self.role)
+        Role::from_str(&self.user.role)
     }
 }
 
@@ -45,11 +43,7 @@ pub async fn require_auth(
         return Err(ApiError::forbidden("User is inactive"));
     }
 
-    req.extensions_mut().insert(AuthenticatedUser {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-    });
+    req.extensions_mut().insert(AuthenticatedUser { user });
 
     Ok(next.run(req).await)
 }

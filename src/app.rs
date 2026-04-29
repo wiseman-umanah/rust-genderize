@@ -27,9 +27,16 @@ pub fn router(state: AppState) -> Router {
             rate_limit::rate_limit,
         ));
 
+    let protected_auth_routes = Router::new()
+        .route("/me", get(github::me))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::auth::middleware::require_auth,
+        ));
+
     Router::new()
         .route("/", get(health))
-        .nest("/auth", auth_routes)
+        .nest("/auth", auth_routes.merge(protected_auth_routes))
         .nest("/api", api::v1::router(state.clone()))
         .layer(middleware::from_fn(logging::log_request))
         .layer(cors)

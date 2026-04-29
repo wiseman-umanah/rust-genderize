@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Query, State, Extension},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect},
     Json,
@@ -142,6 +142,24 @@ pub async fn refresh(
         access_token: pair.access_token,
         refresh_token: pair.refresh_token,
     }))
+}
+
+pub async fn me(
+    State(_state): State<AppState>,
+    Extension(user): Extension<crate::auth::middleware::AuthenticatedUser>,
+) -> ApiResult<Json<serde_json::Value>> {
+    Ok(Json(serde_json::json!({
+        "status": "success",
+        "data": {
+            "id": user.user.id,
+            "github_username": user.user.username,
+            "email": user.user.email,
+            "avatar_url": user.user.avatar_url,
+            "is_active": user.user.is_active,
+            "created_at": user.user.created_at,
+            "updated_at": user.user.updated_at
+        }
+    })))
 }
 
 pub async fn exchange_device_flow(
