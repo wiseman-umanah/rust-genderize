@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State, Extension},
+    extract::{Extension, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect},
     Json,
@@ -28,6 +28,7 @@ pub struct GithubCallbackQuery {
     pub code: String,
     pub state: Option<String>,
     pub code_verifier: Option<String>,
+    pub redirect_uri: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -111,9 +112,11 @@ pub async fn callback(
     }
 
     let pair = tokens::issue_pair(&state.pool, &state.config, &user).await?;
-    
+
     // Check if this is a web portal callback by checking for web redirect URI
-    let is_web_callback = query.redirect_uri.as_ref()
+    let _is_web_callback = query
+        .redirect_uri
+        .as_ref()
         .map(|uri| uri.contains("localhost:5173") || uri.contains("127.0.0.1:5173"))
         .unwrap_or(false);
 
@@ -128,9 +131,18 @@ pub async fn callback(
         .unwrap(),
     );
 
+    // Check if this is a web portal callback
+    let is_web_callback = query
+        .redirect_uri
+        .as_ref()
+        .map(|uri| uri.contains("localhost:5173") || uri.contains("127.0.0.1:5173"))
+        .unwrap_or(false);
+
     if is_web_callback {
-        // For web portal, redirect back to the frontend
-        let redirect_url = query.redirect_uri.as_ref()
+        // For web portal, add redirect header
+        let redirect_url = query
+            .redirect_uri
+            .as_ref()
             .map(|uri| {
                 if uri.contains("?") {
                     format!("{}&auth=success", uri)
@@ -139,18 +151,16 @@ pub async fn callback(
                 }
             })
             .unwrap_or_else(|| format!("{}?auth=success", state.config.web_base_url));
-        
+
         headers.insert(header::LOCATION, redirect_url.parse().unwrap());
-        Ok((headers, StatusCode::FOUND))
-    } else {
-        // For CLI, return JSON response
-        let response = AuthResponse {
-            status: "success",
-            access_token: pair.access_token,
-            refresh_token: pair.refresh_token,
-        };
-        Ok((headers, Json(response)))
     }
+
+    let response = AuthResponse {
+        status: "success",
+        access_token: pair.access_token,
+        refresh_token: pair.refresh_token,
+    };
+    Ok((headers, Json(response)))
 }
 
 pub async fn refresh(
