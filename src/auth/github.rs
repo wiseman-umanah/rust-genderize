@@ -31,6 +31,11 @@ pub struct GithubCallbackQuery {
 }
 
 #[derive(Deserialize)]
+pub struct GithubTokenExchangeRequest {
+    pub github_token: String,
+}
+
+#[derive(Deserialize)]
 struct GithubTokenResponse {
     access_token: String,
 }
@@ -132,6 +137,35 @@ pub async fn refresh(
 ) -> ApiResult<Json<AuthResponse>> {
     let pair =
         tokens::rotate_refresh_token(&state.pool, &state.config, &body.refresh_token).await?;
+    Ok(Json(AuthResponse {
+        status: "success",
+        access_token: pair.access_token,
+        refresh_token: pair.refresh_token,
+    }))
+}
+
+pub async fn exchange_device_flow(
+    State(state): State<AppState>,
+    Json(body): Json<GithubTokenExchangeRequest>,
+) -> ApiResult<Json<AuthResponse>> {
+    // Fetch GitHub user using the device flow token
+    let github_user = fetch_github_user(&body.github_token).await?;
+    let user = repository::upsert_from_github(
+        &state.pool,
+        NewGithubUser {
+            github_id: github_user.id.to_string(),
+            username: github_user.login,
+            email: github_user.email,
+            avatar_url: github_user.avatar_url,
+        },
+    )
+    .await?;
+
+    if !user.is_active {
+        return Err(ApiError::forbidden("User is inactive"));
+    }
+
+    let pair = tokens::issue_pair(&state.pool, &state.config, &user).await?;
     Ok(Json(AuthResponse {
         status: "success",
         access_token: pair.access_token,

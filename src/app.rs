@@ -18,6 +18,7 @@ pub fn router(state: AppState) -> Router {
     let auth_routes = Router::new()
         .route("/github", get(github::start))
         .route("/github/callback", get(github::callback))
+        .route("/github/exchange", post(github::exchange_device_flow))
         .route("/refresh", post(github::refresh))
         .route("/logout", post(github::logout))
         .route("/csrf", get(csrf::csrf_token))
